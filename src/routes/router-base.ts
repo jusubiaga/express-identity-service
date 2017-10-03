@@ -18,8 +18,8 @@ export abstract class RouterBase {
 
     protected abstract routes(): void;
 
-    public getRouter(version: string) {
-        return this.routers[version];
+    public getRouter(version: string) {        
+        return version ? this.routers[version] : this.routers['V1'];
     }
 
 }

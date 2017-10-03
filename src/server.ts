@@ -4,11 +4,15 @@ import * as bodyParser from 'body-parser';
 import * as path from 'path';
 import * as logger from 'morgan';
 import {Express, Request, Response} from 'express';
+import { config } from './config/config';
+import * as mongoose from 'mongoose';
+import * as Jwt from 'jsonwebtoken';
 
 // Routers
 import { ApiRouter } from './routes/router';
 import { RouterBase } from './routes/router-base';
 import { ServiceSampleRouter } from './routes/service-sample.router';
+import { UserRouter } from './modules/user/user.router';
 
 export class Server {
 
@@ -44,6 +48,7 @@ export class Server {
         this.app.use(express.static(__dirname + '/public', {index: 'index.html'}));
 
         // Enable CORS
+        // WARNING THIS IS NOT PRODUCTION READY
         this.app.use(function(req, res, next) {
             res.header('Access-Control-Allow-Origin', '*');
             res.header('Access-Control-Allow-Headers', 'Origin, X-Transaction-Id, Accept-Language, X-Requested-With, Content-Type, Accept');
@@ -56,16 +61,33 @@ export class Server {
             err.status = 404;
             next(err);
         });
+
+        /**
+         * Connect to MongoDB.
+         */
+        //mongoose.Promise = global.Promise;
+        mongoose.connect(config.mongodb);
+
+        mongoose.connection.on('error', () => {
+            console.log('MongoDB connection error. Please make sure MongoDB is running.');
+            process.exit();
+        });
+
+        // this.app.use('/api', this.auth);
     }
 
     private routes(): void {
         const serviceSampleRouter = new ServiceSampleRouter();
+        const userRouter = new UserRouter();
 
         let apiRouter: ApiRouter = new ApiRouter();
 
         // Sample
-        apiRouter.addRoute('v1', 'sample', serviceSampleRouter.getRouter(RouterBase.VERSION.V1), true);
-        apiRouter.addRoute('v2', 'sample', serviceSampleRouter.getRouter(RouterBase.VERSION.V2));
+        apiRouter.addSecureRoute('sample', serviceSampleRouter.getRouter(RouterBase.VERSION.V1), 'v1');
+        apiRouter.addSecureRoute('sample', serviceSampleRouter.getRouter(RouterBase.VERSION.V2), 'v2');
+
+        // Users
+        apiRouter.addRoute('users', userRouter.getRouter(RouterBase.VERSION.V1), 'v1');
 
         // Adding middleware routers
         this.app.use(apiRouter.getRouter());
@@ -76,6 +98,7 @@ export class Server {
             winston.log('info', '--> Server successfully started at port %d', port);
         });
     }
+ 
 }
 
 Server.bootstrap(3000);
