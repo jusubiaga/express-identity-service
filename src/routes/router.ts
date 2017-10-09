@@ -16,16 +16,9 @@ export class ApiRouter {
         return this.router;
     }
 
-    // public addRoute(version: string, path: string, router: express.Router, defaultRoute: boolean = false) {
-    //     this.router.use(`/${API_PREFIX}/${version}/${path}`, router);
-    //     if (defaultRoute) {
-    //         this.router.use(`/${API_PREFIX}/${path}`, router);
-    //     }
-    // }
-
     public addSecureRoute(path: string, router: express.Router, version: string = '') {
         let routePath = this.getRoutePath(path, version);
-        this.router.use(routePath, this.secureRouter, router);
+        this.router.use(routePath, this.isAuthenticated, router);
     }
 
     public addRoute(path: string, router: express.Router, version: string = '') {
@@ -39,17 +32,14 @@ export class ApiRouter {
         // Use versioning
         if (version) {
             routePath = `/${API_PREFIX}/${version}/${path}`;
-            // if (defaultVersion) {
-            //     routePath = `/${API_PREFIX}/${path}`;
-            // }            
         } else {
-            routePath = `/${path}`
+            routePath = `/${path}`;
         }
 
         return routePath;
     }
 
-    private secureRouter(req: express.Request, res: express.Response, next: express.NextFunction) {
+    private isAuthenticated(req: express.Request, res: express.Response, next: express.NextFunction) {
         // check header or url parameters or post parameters for token
         let token = req.body.token || req.query.token || req.headers['x-access-token'];
 
@@ -57,12 +47,12 @@ export class ApiRouter {
         if (token) {
 
             // verifies secret and checks exp
-            Jwt.verify(token, config.secret, function(err, decoded) {      
+            Jwt.verify(token, config.secret, {maxAge: '2 days'}, function(err, decoded) {
                 if (err) {
-                    return res.json({ success: false, message: 'Failed to authenticate token.' });    
+                    return res.json({ success: false, message: 'Failed to authenticate token.' });
                 } else {
                     // if everything is good, save to request for use in other routes
-                    req.decoded = decoded;    
+                    req.decoded = decoded;
                     next();
                 }
             });
@@ -71,12 +61,11 @@ export class ApiRouter {
 
             // if there is no token
             // return an error
-            return res.status(403).send({ 
-                success: false, 
-                message: 'No token provided.' 
+            return res.status(403).send({
+                success: false,
+                message: 'No token provided.'
             });
 
         }
-        
-    }        
+    }
 }
